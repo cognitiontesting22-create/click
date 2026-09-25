@@ -171,6 +171,7 @@ HELLO_GROUP = (
                 "writable": False,
                 "readable": True,
                 "allow_dash": False,
+                "expand_user": False,
             },
             id="Path ParamType",
         ),

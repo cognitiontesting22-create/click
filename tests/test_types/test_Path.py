@@ -72,6 +72,81 @@ def test_path_resolve_symlink(tmp_path, runner):
     assert rel_rv == test_file_str
 
 
+def test_path_expand_user(tmp_path, monkeypatch):
+    """``expand_user=True`` expands ``~`` in the value itself, so paths from
+    env vars, config files, or quoted args resolve to the home directory."""
+    monkeypatch.setenv("HOME", os.fspath(tmp_path))
+    monkeypatch.setenv("USERPROFILE", os.fspath(tmp_path))
+    test_file = tmp_path / "file"
+    test_file.touch()
+
+    type = click.Path(exists=True, expand_user=True)
+    assert type.convert("~/file", None, None) == os.fspath(test_file)
+    assert type.convert("~", None, None) == os.fspath(tmp_path)
+
+
+def test_path_expand_user_envvar(tmp_path, monkeypatch, runner):
+    """Values that arrive through an env var are expanded."""
+    monkeypatch.setenv("HOME", os.fspath(tmp_path))
+    monkeypatch.setenv("USERPROFILE", os.fspath(tmp_path))
+    (tmp_path / "file").touch()
+
+    @click.command()
+    @click.option("-f", type=click.Path(exists=True, expand_user=True), envvar="F")
+    def cli(f):
+        return f
+
+    result = runner.invoke(cli, env={"F": "~/file"}, standalone_mode=False)
+    assert result.return_value == os.fspath(tmp_path / "file")
+
+
+def test_path_expand_user_named(tmp_path, monkeypatch):
+    """The ``~user`` form expands to that user's home. ``~user`` is not
+    expanded on Windows, and ``getpwnam`` ignores ``HOME``, so the lookup is
+    faked to point at ``tmp_path``."""
+    pwd = pytest.importorskip("pwd")
+    monkeypatch.setattr(
+        pwd,
+        "getpwnam",
+        lambda name: pwd.struct_passwd((name, "", 0, 0, "", os.fspath(tmp_path), "")),
+    )
+    test_file = tmp_path / "file"
+    test_file.touch()
+
+    type = click.Path(exists=True, expand_user=True)
+    assert type.convert("~someone/file", None, None) == os.fspath(test_file)
+
+
+def test_path_expand_user_resolve(tmp_path, monkeypatch):
+    """``expand_user`` composes with ``resolve_path``: expand first, then
+    resolve."""
+    monkeypatch.setenv("HOME", os.fspath(tmp_path))
+    monkeypatch.setenv("USERPROFILE", os.fspath(tmp_path))
+    test_file = tmp_path / "file"
+    test_file.touch()
+
+    type = click.Path(exists=True, expand_user=True, resolve_path=True)
+    assert type.convert("~/file", None, None) == os.path.realpath(test_file)
+
+
+def test_path_expand_user_missing(tmp_path, monkeypatch):
+    """Errors report the original value, like ``resolve_path`` does."""
+    monkeypatch.setenv("HOME", os.fspath(tmp_path))
+    monkeypatch.setenv("USERPROFILE", os.fspath(tmp_path))
+
+    with pytest.raises(click.BadParameter, match="'~/missing' does not exist"):
+        click.Path(exists=True, expand_user=True).convert("~/missing", None, None)
+
+
+def test_path_expand_user_default_off(tmp_path, monkeypatch):
+    """By default ``~`` stays a literal path segment, for backwards
+    compatibility."""
+    monkeypatch.chdir(tmp_path)
+
+    with pytest.raises(click.BadParameter, match="does not exist"):
+        click.Path(exists=True).convert("~/file", None, None)
+
+
 def _non_utf8_filenames_supported():
     with tempfile.TemporaryDirectory(prefix="click-pytest-") as tempdir:
         try:

@@ -11,6 +11,9 @@ Unreleased
   returns `None` for hidden options, so help screens are unchanged. {pr}`3821`
 - Document which types are inferred from `default`, and what an unrecognized
   `type` callable does to a command-line value. {issue}`3036` {pr}`3808`
+- {class}`Path` accepts an `expand_user` parameter to expand `~` to the user's
+  home directory, for values from sources the shell did not expand such as
+  environment variables or config files.
 
 ## Version 8.5.0
 

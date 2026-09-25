@@ -1043,6 +1043,7 @@ class PathInfoDict(ParamTypeInfoDict):
     writable: bool
     readable: bool
     allow_dash: bool
+    expand_user: bool
 
 
 class Path(ParamType[str | bytes | os.PathLike[str]]):
@@ -1059,14 +1060,20 @@ class Path(ParamType[str | bytes | os.PathLike[str]]):
     :param writable: if true, a writable check is performed.
     :param executable: if true, an executable check is performed.
     :param resolve_path: Make the value absolute and resolve any
-        symlinks. A ``~`` is not expanded, as this is supposed to be
-        done by the shell only.
+        symlinks. Does not expand ``~``; use ``expand_user`` for that.
+    :param expand_user: Expand ``~`` and ``~user`` to a user's home
+        directory. Useful when the value comes from an environment
+        variable, config file, or quoted argument, where the shell did
+        not expand it.
     :param allow_dash: Allow a single dash as a value, which indicates
         a standard stream (but does not open it). Use
         :func:`~click.open_file` to handle opening this value.
     :param path_type: Convert the incoming path value to this type. If
         ``None``, keep Python's default, which is ``str``. Useful to
         convert to :class:`pathlib.Path`.
+
+    .. versionchanged:: 8.5.1
+        Added the ``expand_user`` parameter.
 
     .. versionchanged:: 8.1
         Added the ``executable`` parameter.
@@ -1088,6 +1095,7 @@ class Path(ParamType[str | bytes | os.PathLike[str]]):
     executable: bool
     resolve_path: bool
     allow_dash: bool
+    expand_user: bool
     name: str
 
     def __init__(
@@ -1101,6 +1109,7 @@ class Path(ParamType[str | bytes | os.PathLike[str]]):
         allow_dash: bool = False,
         path_type: type | None = None,
         executable: bool = False,
+        expand_user: bool = False,
     ) -> None:
         self.exists = exists
         self.file_okay = file_okay
@@ -1110,6 +1119,7 @@ class Path(ParamType[str | bytes | os.PathLike[str]]):
         self.executable = executable
         self.resolve_path = resolve_path
         self.allow_dash = allow_dash
+        self.expand_user = expand_user
         self.type: type | None = path_type
 
         if self.file_okay and not self.dir_okay:
@@ -1127,6 +1137,7 @@ class Path(ParamType[str | bytes | os.PathLike[str]]):
             "writable": self.writable,
             "readable": self.readable,
             "allow_dash": self.allow_dash,
+            "expand_user": self.expand_user,
             **super().to_info_dict(),
         }
 
@@ -1155,6 +1166,9 @@ class Path(ParamType[str | bytes | os.PathLike[str]]):
         is_dash = self.file_okay and self.allow_dash and rv == dash
 
         if not is_dash:
+            if self.expand_user:
+                rv = os.path.expanduser(rv)
+
             if self.resolve_path:
                 rv = os.path.realpath(rv)
 
@@ -1206,7 +1220,7 @@ class Path(ParamType[str | bytes | os.PathLike[str]]):
                     ctx,
                 )
 
-            if self.executable and not os.access(value, os.X_OK):
+            if self.executable and not os.access(rv, os.X_OK):
                 self.fail(
                     _("{name} {filename!r} is not executable.").format(
                         name=self.name.title(), filename=format_filename(value)
