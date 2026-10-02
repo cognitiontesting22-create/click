@@ -321,11 +321,13 @@ if t.TYPE_CHECKING:
     class ChoiceInfoDict(ParamTypeInfoDict, t.Generic[_ValueT_co]):
         choices: tuple[_ValueT_co, ...]
         case_sensitive: bool
+        strip: bool
 else:
 
     class ChoiceInfoDict(ParamTypeInfoDict):
         choices: tuple[t.Any, ...]
         case_sensitive: bool
+        strip: bool
 
 
 class Choice(ParamType[_ValueT_co], t.Generic[_ValueT_co]):
@@ -341,6 +343,11 @@ class Choice(ParamType[_ValueT_co], t.Generic[_ValueT_co]):
 
     :param case_sensitive: Set to false to make choices case
         insensitive. Defaults to true.
+    :param strip: Set to true to strip leading and trailing whitespace
+        from the passed value before matching. Defaults to false.
+
+    .. versionchanged:: 8.5.1
+        Added the ``strip`` parameter.
 
     .. versionchanged:: 8.4.0
         Now generic in the choice value type. Parameterize with the type of
@@ -360,17 +367,23 @@ class Choice(ParamType[_ValueT_co], t.Generic[_ValueT_co]):
 
     choices: tuple[_ValueT_co, ...]
     case_sensitive: bool
+    strip: bool
 
     def __init__(
-        self, choices: cabc.Iterable[_ValueT_co], case_sensitive: bool = True
+        self,
+        choices: cabc.Iterable[_ValueT_co],
+        case_sensitive: bool = True,
+        strip: bool = False,
     ) -> None:
         self.choices = tuple(choices)
         self.case_sensitive = case_sensitive
+        self.strip = strip
 
     def to_info_dict(self) -> ChoiceInfoDict[_ValueT_co]:
         return {
             "choices": self.choices,
             "case_sensitive": self.case_sensitive,
+            "strip": self.strip,
             **super().to_info_dict(),
         }
 
@@ -448,6 +461,9 @@ class Choice(ParamType[_ValueT_co], t.Generic[_ValueT_co]):
         matching normalized value in the list of choices. Then return the
         matched "original" choice.
         """
+        if self.strip and isinstance(value, str):
+            value = value.strip()
+
         normed_value = self.normalize_choice(choice=value, ctx=ctx)
         normalized_mapping = self._normalized_mapping(ctx=ctx)
 

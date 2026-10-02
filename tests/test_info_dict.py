@@ -113,6 +113,7 @@ HELLO_GROUP = (
                 "name": "choice",
                 "choices": ("a", "b"),
                 "case_sensitive": True,
+                "strip": False,
             },
             id="Choice ParamType",
         ),
