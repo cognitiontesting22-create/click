@@ -14,6 +14,8 @@ Unreleased
 - {class}`Path` accepts an `expand_user` parameter to expand `~` to the user's
   home directory, for values from sources the shell did not expand such as
   environment variables or config files.
+- {class}`Choice` accepts a `strip` parameter to strip leading and trailing
+  whitespace from the value before matching it against the choices.
 
 ## Version 8.5.0
 
